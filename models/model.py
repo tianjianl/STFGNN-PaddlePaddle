@@ -66,7 +66,7 @@ class STFGNNModel(nn.Layer):
     
     def STFGN_layer(self, data, fusion, activation)
 
-        '''
+        """
         mutiple STFGN_modules + Gated CNN = STFGN Layer    
         Parameters
         ----------
@@ -81,7 +81,7 @@ class STFGNNModel(nn.Layer):
         Returns
         ----------
         output shape is (B, T-3, N, C')
-        '''
+        """
 
         # shape is (B, T, N, C)
         data = position_embedding(data, T, num_of_vertices, num_of_features,
@@ -132,7 +132,7 @@ class STFGNNModel(nn.Layer):
    
 
     def output_layer(self, data, num):
-        '''
+        """
         Parameters
         ----------
         data: paddle tensor, shape is (B, T, N, C)
@@ -140,7 +140,8 @@ class STFGNNModel(nn.Layer):
         Returns
         ----------
         padddle tensor of shape (B, T', N)
-        '''
+        
+	"""
 
         # data shape is (B, N, T, C)
         data = paddle.transpose(data, (0, 2, 1, 3))
