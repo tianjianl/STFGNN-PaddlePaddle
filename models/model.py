@@ -4,23 +4,18 @@ import paddle.nn.functional as func
 
 class STFGNNModel(nn.Layer):
     """implementation of STFGNN in https://arxiv.org/abs/2012.09641"""
-    def __init__(self, args):
+    def __init__(self, config):
         super(STFGNNModel, self).__init__()
-        self.args = args
-    
+        self.config = config
+        self.n_pred = config['n_pred']
+        self.layers = config['layers']
+        self.graph_linear = nn.Linear()
+        self.conv2ds_left = nn.LayerList([nn.Conv2D() for _ in range(self.layers)])
+        self.conv2ds_right = nn.LayerList([nn.Conv2D() for _ in range(self.layers)])
+        self.output_linears_1 = nn.LayerList([nn.Linear() for _ in range(self.n_pred)])
+        self.output_linears_2 = nn.LayerList([nn.Linear() for _ in range(self.n_pred)])
     
     def graph_mul_block(self, data, fusion, activation):
-    """
-    graph multiplication block
-    _________________________
-    
-    data: paddle tensor, input data shape of (4N, B, C)
-
-    fusion: paddle tensor, STF matrix shape of (4N, 4N)
-
-    returns: paddle tensor, shape of (4N, B, C')
-   
-    """
         assert activation in {'glu', 'relu'}
         data = paddle.matmul(fusion, data)
         #(4N, B, C)
@@ -30,7 +25,7 @@ class STFGNNModel(nn.Layer):
         if activation == 'glu':
             left, right = paddle.split(data, num_or_sections=2, axis=2)
             return left + func.sigmoid(right)
-        elif activation == 'relu'
+        elif activation == 'relu':
             return func.relu(data)
 
 
@@ -58,15 +53,16 @@ class STFGNNModel(nn.Layer):
 
         # shape of each element is (1, N, B, C'), concat into (L, N, B, C') then selected max to get (N, B, C')
 
-    	N, B, C_prime = int(data.shape[0]/4), data.shape[1], len(filers)
-        need_concat = [paddle.expand(i[N:2*N,:,:], [1, N, B, C_prime] for i in need_concat] 
+        N, B, C_prime = int(data.shape[0]/4), data.shape[1], len(filers)
+
+        need_concat = [paddle.expand(i[N:2*N,:,:], [1, N, B, C_prime]) for i in need_concat] 
         need_concat = paddle.concat(need_concat) #(L, N, B, C')
         return paddle.max(need_concat, axis=0)  #(N, B, C')
 
     
-    def STFGN_layer(self, data, fusion, activation)
+    def STFGN_layer(self, data, fusion, activation, num):
 
-        """
+        '''
         mutiple STFGN_modules + Gated CNN = STFGN Layer    
         Parameters
         ----------
@@ -81,8 +77,10 @@ class STFGNNModel(nn.Layer):
         Returns
         ----------
         output shape is (B, T-3, N, C')
-        """
-
+        '''
+        
+        conv2d_left = self.conv2ds_left[num]
+        conv2d_right = self.conv2ds_right[num]
         # shape is (B, T, N, C)
         data = position_embedding(data, T, num_of_vertices, num_of_features,
                                   temporal_emb, spatial_emb,
@@ -92,8 +90,8 @@ class STFGNNModel(nn.Layer):
         # shape of data temp is (B, C, N, T)
         c_prime = len(filters)
         data_temp = paddle.transpose(data, (0, 3, 2, 1))
-        data_left = func.sigmoid(self.conv2d_left(data_temp))
-        data_right = paddle.tanh(self.conv2d_right(data_temp))
+        data_left = func.sigmoid(conv2d_left(data_temp))
+        data_right = paddle.tanh(conv2d_right(data_temp))
         data_time_axis = data_left * data_right
     
 
@@ -125,14 +123,14 @@ class STFGNNModel(nn.Layer):
             # shape is (B, T-3, N, C')
             after_concat = paddle.concat(need_concat, axis=1)
     
-            if self.args.use_gated = True:
+            if self.args.use_gated == True:
                 return after_concat + data_res
             else:
                 return after_concat
    
 
     def output_layer(self, data, num):
-        """
+        '''
         Parameters
         ----------
         data: paddle tensor, shape is (B, T, N, C)
@@ -140,9 +138,10 @@ class STFGNNModel(nn.Layer):
         Returns
         ----------
         padddle tensor of shape (B, T', N)
-        
-	"""
+        '''
 
+        linear1 = self.output_linears_1[num]
+        linear2 = self.output_linears_2[num]
         # data shape is (B, N, T, C)
         data = paddle.transpose(data, (0, 2, 1, 3))
 
@@ -150,19 +149,19 @@ class STFGNNModel(nn.Layer):
         data = paddle.reshape(data, (-1, self.args.N, input_length * num_of_features))
 
         # (B, N, C')
-        data = func.relu(self.output_linear1(data)
+        data = func.relu(linear1(data))
 
         # (B, N, T'=4)
-        data = self.output_linear2(data)
+        data = linear2(data)
 
         return data
 
     def forward(self, data, fusion, label):
-        for i in range(self.args.lnum):
+        for i in range(self.config['layers']):
             data = STFGN_layer(data, fusion, self.args.activation, i)
         
         need_concat = []
-        for i in range(self.args.predlen):
+        for i in range(self.config['n_pred']):
             need_concat.append(output_layer(data, i))
         
         #(B , N, predlen * numclass)
@@ -175,4 +174,3 @@ class STFGNNModel(nn.Layer):
         loss = paddle.mean(loss)
         #ysoft shape is (B, N, predlen, 5)
         return loss, [paddle.argmax(ysoft[:, :, i, :], axis=-1) for i in range(predlen)]
-        
