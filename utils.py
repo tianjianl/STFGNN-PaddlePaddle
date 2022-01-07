@@ -6,7 +6,7 @@ import pandas as pd
 
 
 def construct_model(config):
-    from models.stsgcn_4n_res import STFGNNModel
+    from models.model import STFGNNModel
 
     module_type = config['module_type']
     act_type = config['act_type']
