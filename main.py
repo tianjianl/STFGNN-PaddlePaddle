@@ -30,7 +30,6 @@ def main(args):
 
     loaders = []
     true_values = []
-    
 
     """
     for idx, (x, y) in enumerate(generate_data(graph_signal_matrix_filename)):
@@ -79,13 +78,6 @@ def main(args):
     )
     """
     
-    #lr_sch = mx.lr_scheduler.PolyScheduler(
-    #    max_update=global_train_steps * epochs * config['max_update_factor'],
-    #    base_lr=config['learning_rate'],
-    #    pwr=2,
-    #    warmup_steps=global_train_steps
-    #)
-    #setting lr and optimizers 
     opt = config['optimizer']
     lr = paddle.optimizer.lr.PolynomialDecay(learning_rate=config['learning_rate'], decay_steps=20, verbose=True)
     if opt == 'RMSProp':
