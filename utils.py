@@ -6,7 +6,7 @@ import pandas as pd
 
 
 def construct_model(config):
-    from models.model import STFGNNModel
+    from models.stsgcn_4n_res import STFGNNModel
 
     module_type = config['module_type']
     act_type = config['act_type']
@@ -48,22 +48,18 @@ def construct_model(config):
     filters = config['filters']
     first_layer_embedding_size = config['first_layer_embedding_size']
     
-    if first_layer_embedding_size:
-        data = nn.functional.Relu(
-             paddle.static.nn.fc(
-                data,
-                first_layer_embedding_size
-            )
-        )
-    else:
-        first_layer_embedding_size = num_of_features
+   # if first_layer_embedding_size:
+   #     data = nn.functional.relu(
+   #          paddle.static.nn.fc(
+   #             data,
+   #             first_layer_embedding_size
+   #        )
+   #     )
+   # else:
+   #     first_layer_embedding_size = num_of_features
     
-    model = STFGNNModel(config)
+    model = STFGNNModel(config, adj_mx)
     
-    assert net.infer_shape(
-        data=(batch_size, points_per_hour, num_of_vertices, 1),
-        label=(batch_size, num_for_predict, num_of_vertices)
-    )[1][1] == (batch_size, num_for_predict, num_of_vertices)
     return model
 
 def weight_matrix(file_path, sigma2=0.1, epsilon=0.5, scaling=True):
@@ -248,7 +244,7 @@ def generate_from_data(data, length, transformer):
     for line1, line2 in ((0, train_line),
                          (train_line, val_line),
                          (val_line, length)):
-        x, y = generate_seq(data['data'][line1: line2], 12, 12)
+        x, y = generate_seq(data[line1: line2], 12, 12)
         if transformer:
             x = transformer(x)
             y = transformer(y)
@@ -263,24 +259,24 @@ def generate_data(graph_signal_matrix_filename, transformer=None):
     '''
     shape is (num_of_samples, 12, num_of_vertices, 1)
     '''
-    data = np.load(graph_signal_matrix_filename)
+    data = pd.read_csv(graph_signal_matrix_filename)
+    data = data.drop('date', 1)
     keys = data.keys()
     if 'train' in keys and 'val' in keys and 'test' in keys:
         for i in generate_from_train_val_test(data, transformer):
             yield i
-    elif 'data' in keys:
-        length = data['data'].shape[0]
+    else:
+        length = data.shape[0]
         for i in generate_from_data(data, length, transformer):
             yield i
-    else:
-        raise KeyError("neither data nor train, val, test is in the data")
 
 
 def generate_seq(data, train_length, pred_length):
     seq = np.concatenate([np.expand_dims(
         data[i: i + train_length + pred_length], 0)
         for i in range(data.shape[0] - train_length - pred_length + 1)],
-        axis=0)[:, :, :, 0: 1]
+        axis=0)
+    seq = np.expand_dims(seq, -1)
     return np.split(seq, 2, axis=1)
 
 

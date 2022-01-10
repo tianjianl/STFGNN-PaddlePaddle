@@ -1,6 +1,8 @@
 {
     "module_type": "individual",
-    "act_type": "GLU",
+    "use_gpu": "False",
+    "act_type": "glu",
+    "gated_cnn": "True",
     "temporal_emb": true,
     "spatial_emb": true,
     "use_mask": true,
@@ -21,6 +23,7 @@
     "graph_signal_matrix_filename": "jam.csv", 
     "num_of_vertices": 330,
     "points_per_hour": 4,
+    "num_of_history": 12,
     "num_for_predict": 1,
     "num_of_features": 1,
     "adj_dtw_filename": "jam_dtw.csv"

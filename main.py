@@ -8,7 +8,7 @@ import pgl
 
 from pgl.utils.logger import log 
 from utils import (construct_model, generate_data, masked_mae_np, masked_mape_np, masked_mse_np)
-from data_loader.data_utils import data_gen_mydata, gen_batch
+from data_loader.data_utils import gen_batch
 
 def main(args):
     
@@ -22,61 +22,29 @@ def main(args):
     batch_size = config['batch_size']
     num_of_vertices = config['num_of_vertices']
     graph_signal_matrix_filename = config['graph_signal_matrix_filename']
-    n_his = config['n_his']
-    n_pred = config['n_pred']
-    
-    if config['use_gpu'] == True:
+    n_his = config['num_of_history']
+    n_pred = config['num_for_predict']
+    epochs = config['epochs']   
+    if config['use_gpu'] == "True":
         paddle.set_device("gpu")    
 
     loaders = []
     true_values = []
 
-    """
     for idx, (x, y) in enumerate(generate_data(graph_signal_matrix_filename)):
         if args.test:
             x = x[:100]
             y = y[:100]
         y = y.squeeze(axis=-1)
-        print(x.shape, y.shape)
-        loaders.append(
-            paddle.io.BatchSampler(
-                x, y if idx == 0 else None,
-                batch_size=batch_size,
-                shuffle=(idx == 0),
-                label_name='label'
-            )
-        )
         if idx == 0:
+            loaders.append([(x_batch,y[num_of_batch*batch_size:(num_of_batch+1)*batch_size]) for num_of_batch, x_batch in enumerate(gen_batch(x, batch_size, dynamic_batch=False, shuffle=False))])
             training_samples = x.shape[0]
         else:
             true_values.append(y)
+    
+    print(len(loaders))
+    train_loader = loaders[0]
 
-    train_loader, val_loader, test_loader = loaders
-    val_y, test_y = true_values
-
-    global_epoch = 1
-    global_train_steps = training_samples // batch_size + 1
-    all_info = []
-    epochs = config['epochs']
-
-    mod = mx.mod.Module(
-        net,
-        data_names=['data'],
-        label_names=['label'],
-        context=ctx
-    )
-
-    mod.bind(
-        data_shapes=[(
-            'data',
-            (batch_size, config['points_per_hour'], num_of_vertices, 1)
-        ), ],
-        label_shapes=[(
-            'label',
-            (batch_size, config['points_per_hour'], num_of_vertices)
-        )]
-    )
-    """
     
     opt = config['optimizer']
     lr = paddle.optimizer.lr.PolynomialDecay(learning_rate=config['learning_rate'], decay_steps=20, verbose=True)
@@ -99,21 +67,19 @@ def main(args):
         else:
             trainable += mulValue  
     
-    print('total parameters: %s, trainable parameters: %s, nontrainbale parameters: %s' %(total, trainable, nontrainable))
+    print('total parameters: %s, trainable parameters: %s, nontrainbale parameters: %s' %(num_of_parameters, trainable, nontrainable))
     lowest_val_loss = 1e6
     for epoch in range(epochs):
         t = time.time()
         acc_list = []
-        for idx, x_batch in enumerate(train_loader):
+        for idx, (x_batch, y_batch) in enumerate(train_loader):
             #shape of x_batch (B, n_his+n_pred, N, 1)
-            x = np.array(x_batch[:, :n_his, :, :], dtype=np.int32)
-            y = np.array(x_batch[:, n_his:, :, :], dtype=np.int32)
-            graph = gf.build_graph(x)
-            graph.tensor()
+            x = np.array(x_batch, dtype=np.int32)
+            y = np.array(y_batch, dtype=np.int32)
             #model takes it input in the form of (B, n_his+n_pred, N, 1) to generate an pred array of (n_his, num_class) and the loss
             #the training accuracy of one epoch is by calculating the mean of the prediction of every batch 
             
-            yhat, loss = model(graph, x)
+            yhat, loss = model(x, y)
             #shape of y is (B, n_pred, N, 1)
             #shape of yhat is (B, n_pred, N, 1)
             acc = calc_acc(y, yhat)
