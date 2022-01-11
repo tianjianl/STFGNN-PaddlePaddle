@@ -40,11 +40,12 @@ def main(args):
             loaders.append([(x_batch,y[num_of_batch*batch_size:(num_of_batch+1)*batch_size]) for num_of_batch, x_batch in enumerate(gen_batch(x, batch_size, dynamic_batch=False, shuffle=False))])
             training_samples = x.shape[0]
         else:
+            loaders.append((x,y))
             true_values.append(y)
     
-    print(len(loaders))
     train_loader = loaders[0]
-
+    val_loader = loaders[1]
+    test_loader = loaders[2]
     
     opt = config['optimizer']
     lr = paddle.optimizer.lr.PolynomialDecay(learning_rate=config['learning_rate'], decay_steps=20, verbose=True)
@@ -94,15 +95,13 @@ def main(args):
         
         print('training: Epoch: %s, ACC: %.4f, time: %.2f' % (epoch, np.mean(acc_list),time.time() - t))
         #The entrire val set is view as a single batch, batch_size is fixed to be equal to length of val set and test set
-        x_val = 1 
-        y_val = 1
+        x_val, y_val = val_loader
         y_hat_val, loss_val = model(x_val, y_val)
         acc_val = calc_acc(y_val, y_hat_val) 
         print('validation: Epoch: %s, ACC: %.4f, loss: %.4f, time: %.2f' % (epoch, acc_val, loss_val, time.time() - t))
 
         if loss_val < lowest_val_loss:
-            x_test = 1 
-            y_test = 1
+            x_test, y_test = test_loader
             y_hat_test, loss_test = model(x_test, y_test)
             acc_test = calc_acc(y_test, y_hat_test)
 
