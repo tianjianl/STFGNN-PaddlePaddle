@@ -96,18 +96,14 @@ def main(args):
         #The entrire val set is view as a single batch, batch_size is fixed to be equal to length of val set and test set
         x_val = 1 
         y_val = 1
-        graph = gf.build_graph(x_val)
-        graph.tensor()
-        y_hat_val, loss_val = model(graph, x_val)
+        y_hat_val, loss_val = model(x_val, y_val)
         acc_val = calc_acc(y_val, y_hat_val) 
         print('validation: Epoch: %s, ACC: %.4f, loss: %.4f, time: %.2f' % (epoch, acc_val, loss_val, time.time() - t))
 
         if loss_val < lowest_val_loss:
             x_test = 1 
             y_test = 1
-            graph = gf.build_graph(x_test)
-            graph.tensor()
-            y_hat_test, loss_test = model(graph, x_test)
+            y_hat_test, loss_test = model(x_test, y_test)
             acc_test = calc_acc(y_test, y_hat_test)
 
             print('test: Epoch: %s, ACC: %.4f, loss: %.4f, time: %.2f' % (epoch, acc_test, loss_test, time.time() - t))
