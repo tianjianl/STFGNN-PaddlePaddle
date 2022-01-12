@@ -33,15 +33,6 @@ def construct_model(config):
     print("The shape of localized adjacency matrix: {}".format(
         adj_mx.shape), flush=True)
     
-    '''
-    data = mx.sym.var("data")
-    label = mx.sym.var("label")
-    adj = mx.sym.Variable('adj', shape=adj_mx.shape,
-                          init=mx.init.Constant(value=adj_mx.tolist()))
-    adj = mx.sym.BlockGrad(adj)
-    mask_init_value = mx.init.Constant(value=(adj_mx != 0)
-                                       .astype('float32').tolist())
-    '''
     
     filters = config['filters']
     first_layer_embedding_size = config['first_layer_embedding_size']
