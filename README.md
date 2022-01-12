@@ -1,6 +1,7 @@
 # STFGNN-PaddlePaddle
-A PaddlePaddle re-implementation of the STFGNN model described in https://arxiv.org/abs/2012.09641.    
-[Here](STFGNN.pdf) are some notes explaining the model written by myself.
+A PaddlePaddle re-implementation of the STFGNN model described in https://arxiv.org/abs/2012.09641.  
+
+I have also written some [notes](STFGNN.pdf) explaining the model.
 
 
 ## Contents
