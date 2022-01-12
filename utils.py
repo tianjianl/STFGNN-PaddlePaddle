@@ -238,7 +238,7 @@ def generate_from_train_val_test(data, transformer):
 def generate_from_data(data, length, transformer):
     mean = None
     std = None
-    train_line, val_line = int(length * 0.8), int(length * 0.9)
+    train_line, val_line = int(length * 0.95), int(length * 0.98)
     for line1, line2 in ((0, train_line),
                          (train_line, val_line),
                          (val_line, length)):

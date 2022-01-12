@@ -100,19 +100,19 @@ def main(args):
         x_val, y_val = val_loader
         x_val = np.array(x_val, dtype=np.int32)
         y_val = np.array(y_val, dtype=np.int32)
-        y_hat_val, loss_val = model(x_val, y_val)
+        loss_val, y_hat_val = model(x_val, y_val)
         acc_val = calc_acc(y_val, y_hat_val) 
-        print('validation: Epoch: %s, ACC: %.4f, loss: %.4f, time: %.2f' % (epoch, acc_val, loss_val, time.time() - t))
-
+        print('validation: Epoch: %s, ACC: %.4f, time: %.2f' % (epoch, acc_val, time.time() - t))   
         if loss_val < lowest_val_loss:
+            x_test, y_test = test_loader
             x_test = np.array(x_test, dtype=np.int32)
             y_test = np.array(y_test, dtype=np.int32)
-            x_test, y_test = test_loader
-            y_hat_test, loss_test = model(x_test, y_test)
+            
+            loss_test, y_hat_test = model(x_test, y_test)
             acc_test = calc_acc(y_test, y_hat_test)
 
-            print('test: Epoch: %s, ACC: %.4f, loss: %.4f, time: %.2f' % (epoch, acc_test, loss_test, time.time() - t))
-            lowest_val_loss = loss_val
+            print('test: Epoch: %s, ACC: %.4f, time: %.2f' % (epoch, acc_test, time.time() - t))
+            lowest_val_loss = loss_val[0]
 
     
 if __name__ == "__main__":
