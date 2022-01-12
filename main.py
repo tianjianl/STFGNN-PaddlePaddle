@@ -7,7 +7,7 @@ import paddle
 import pgl
 
 from pgl.utils.logger import log 
-from utils import (construct_model, generate_data, masked_mae_np, masked_mape_np, masked_mse_np)
+from utils import (construct_model, generate_data, calc_acc)
 from data_loader.data_utils import gen_batch
 
 def main(args):
@@ -46,15 +46,17 @@ def main(args):
     train_loader = loaders[0]
     val_loader = loaders[1]
     test_loader = loaders[2]
-    
+ 
+    x_val, y_val = val_loader
     opt = config['optimizer']
     lr = paddle.optimizer.lr.PolynomialDecay(learning_rate=config['learning_rate'], decay_steps=20, verbose=True)
+    
     if opt == 'RMSProp':
         optim = paddle.optimizer.RMSProp(learning_rate=lr, parameters=model.parameters())
-    elif opt == 'Adam':
+    elif opt == 'adam' or 'Adam':
         optim = paddle.optimizer.Adam(learning_rate=lr, parameters=model.parameters())
     
-
+    
 
     num_of_parameters = 0
     trainable = 0
@@ -80,9 +82,9 @@ def main(args):
             #model takes it input in the form of (B, n_his+n_pred, N, 1) to generate an pred array of (n_his, num_class) and the loss
             #the training accuracy of one epoch is by calculating the mean of the prediction of every batch 
             
-            yhat, loss = model(x, y)
-            #shape of y is (B, n_pred, N, 1)
-            #shape of yhat is (B, n_pred, N, 1)
+            loss, yhat = model(x, y)
+            #shape of y is (B, n_pred, N)
+            #yhat is a list of length n_pred, each entry of shape B, N
             acc = calc_acc(y, yhat)
             acc_list.append(acc)
             loss.backward()
@@ -96,11 +98,15 @@ def main(args):
         print('training: Epoch: %s, ACC: %.4f, time: %.2f' % (epoch, np.mean(acc_list),time.time() - t))
         #The entrire val set is view as a single batch, batch_size is fixed to be equal to length of val set and test set
         x_val, y_val = val_loader
+        x_val = np.array(x_val, dtype=np.int32)
+        y_val = np.array(y_val, dtype=np.int32)
         y_hat_val, loss_val = model(x_val, y_val)
         acc_val = calc_acc(y_val, y_hat_val) 
         print('validation: Epoch: %s, ACC: %.4f, loss: %.4f, time: %.2f' % (epoch, acc_val, loss_val, time.time() - t))
 
         if loss_val < lowest_val_loss:
+            x_test = np.array(x_test, dtype=np.int32)
+            y_test = np.array(y_test, dtype=np.int32)
             x_test, y_test = test_loader
             y_hat_test, loss_test = model(x_test, y_test)
             acc_test = calc_acc(y_test, y_hat_test)

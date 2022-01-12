@@ -1,7 +1,7 @@
 import paddle 
 import paddle.nn as nn 
 import paddle.nn.functional as func
-
+import numpy as np
 class STFGNNModel(nn.Layer):
     """implementation of STFGNN in https://arxiv.org/abs/2012.09641"""
     def __init__(self, config, mat):
@@ -9,13 +9,13 @@ class STFGNNModel(nn.Layer):
         self.config = config
         self.n_pred = config['num_for_predict']
         self.layers = len(config['filters'])
-        self.graph_linear = nn.Linear(64, 128)
-        self.conv2ds_left = nn.LayerList([nn.Conv2D(64, 64, [4,1], data_format='NHWC') for _ in range(self.layers)])
-        self.conv2ds_right = nn.LayerList([nn.Conv2D(64, 64, [4,1], data_format='NHWC') for _ in range(self.layers)])
-        self.output_linears_1 = nn.LayerList([nn.Linear(64, 64) for _ in range(self.n_pred)])
-        self.output_linears_2 = nn.LayerList([nn.Linear(64, 64) for _ in range(self.n_pred)])
+        self.graph_linear = nn.Linear(32, 64)
+        self.conv2ds_left = nn.LayerList([nn.Conv2D(32, 32, [4,1], data_format='NHWC') for _ in range(self.layers)])
+        self.conv2ds_right = nn.LayerList([nn.Conv2D(32, 32, [4,1], data_format='NHWC') for _ in range(self.layers)])
+        self.output_linears_1 = nn.LayerList([nn.Linear(32*3, 32) for _ in range(self.n_pred)])
+        self.output_linears_2 = nn.LayerList([nn.Linear(32, 5) for _ in range(self.n_pred)])
         self.fusion = paddle.to_tensor(mat, dtype=paddle.float32)
-        self.emb = nn.Embedding(7, 64)
+        self.emb = nn.Embedding(7, 32)
     
     
     
@@ -64,7 +64,7 @@ class STFGNNModel(nn.Layer):
 
         # shape of each element is (1, N, B, C'), concat into (L, N, B, C') then selected max to get (N, B, C')
 
-        N, B, C_prime = int(data.shape[0]/4), data.shape[1], 64
+        N, B, C_prime = int(data.shape[0]/4), data.shape[1], 32
 
         need_concat = [paddle.reshape(i[N:2*N,:,:], [1, N, B, C_prime]) for i in need_concat] 
         need_concat = paddle.concat(need_concat) #(L, N, B, C')
@@ -147,44 +147,52 @@ class STFGNNModel(nn.Layer):
 
         Returns
         ----------
-        padddle tensor of shape (B, T', N)
+        padddle tensor of shape (B, N, 1)
+
+        The output_layer outputs one prediction 
         '''
 
         linear1 = self.output_linears_1[num]
         linear2 = self.output_linears_2[num]
-        # data shape is (B, N, T, C)
+        # data shape is (B, N, T', C)
         data = paddle.transpose(data, (0, 2, 1, 3))
-
-        # (B, N, T * C)
-        data = paddle.reshape(data, (-1, self.args.N, input_length * num_of_features))
-
+        # (B, N, T' * C)
+        input_length = self.config['num_of_history']
+        data = paddle.flatten(data, start_axis=2, stop_axis=3)
         # (B, N, C')
         data = func.relu(linear1(data))
 
-        # (B, N, T'=4)
+        # (B, N, num_class)
         data = linear2(data)
-
         return data
 
     def forward(self, data, label):
+        predlen = self.config['num_for_predict']
         fusion = self.fusion
         activation = self.config['act_type']
         data = paddle.to_tensor(data)
-       
+        label = np.expand_dims(label, axis=-1)
+        label = paddle.to_tensor(label)
+        #label shape B 12 N 1
+        label = label[:, :predlen, :, :]
+        label = paddle.transpose(label, (0, 2, 1, 3))
+
         data = self.emb(data)
         for i in range(len(self.config['filters'])):
             data = self.STFGN_layer(data, fusion, activation, i)
         
         need_concat = []
-        for i in range(self.config['n_pred']):
-            need_concat.append(output_layer(data, i))
+        for i in range(self.config['num_for_predict']):
+            need_concat.append(self.output_layer(data, i))
         
         #(B , N, predlen * numclass)
-        yhat = paddle.concat(need_concat, axis=1)
+        y_hat = paddle.concat(need_concat, axis=1)
         #(B, N, predlen, numclass)
         #label shape (B, N, predlen, 1)
-        yhat = paddle.expand(y_hat, (y_hat.shape[0], y_hat.shape[1], self.args.predlen, 5))
-        loss, ysoft = func.softmax_with_cross_entropy(logits=yhat, label=label, return_softmax=True)
+
+        y_hat = paddle.reshape(y_hat, (y_hat.shape[0], y_hat.shape[1], self.config['num_for_predict'], 5))
+        label = paddle.cast(label, 'int64')
+        loss, ysoft = func.softmax_with_cross_entropy(logits=y_hat, label=label, return_softmax=True)
         loss = paddle.mean(loss)
         #ysoft shape is (B, N, predlen, 5)
         return loss, [paddle.argmax(ysoft[:, :, i, :], axis=-1) for i in range(predlen)]

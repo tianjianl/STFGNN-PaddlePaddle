@@ -28,9 +28,7 @@ def construct_model(config):
 
     adj = get_adjacency_matrix(adj_filename, num_of_vertices,
                                id_filename=id_filename)
-    #adj_mx = construct_adj(adj, 3)
     adj_dtw = np.array(pd.read_csv(config['adj_dtw_filename'], header=None))
-    #xxx
     adj_mx = construct_adj_fusion(adj, adj_dtw, 4)
     print("The shape of localized adjacency matrix: {}".format(
         adj_mx.shape), flush=True)
@@ -240,10 +238,11 @@ def generate_from_train_val_test(data, transformer):
 def generate_from_data(data, length, transformer):
     mean = None
     std = None
-    train_line, val_line = int(length * 0.6), int(length * 0.8)
+    train_line, val_line = int(length * 0.8), int(length * 0.9)
     for line1, line2 in ((0, train_line),
                          (train_line, val_line),
                          (val_line, length)):
+        print(line1, line2)
         x, y = generate_seq(data[line1: line2], 12, 12)
         if transformer:
             x = transformer(x)
@@ -280,31 +279,29 @@ def generate_seq(data, train_length, pred_length):
     return np.split(seq, 2, axis=1)
 
 
-def mask_np(array, null_val):
-    if np.isnan(null_val):
-        return (~np.isnan(null_val)).astype('float32')
-    else:
-        return np.not_equal(array, null_val).astype('float32')
+ 
+def calc_acc(y, y_hat):
+    """
+    calculates the accuracy
+    __________________________
 
+    Parameters:
 
-def masked_mape_np(y_true, y_pred, null_val=np.nan):
-    with np.errstate(divide='ignore', invalid='ignore'):
-        mask = mask_np(y_true, null_val)
-        mask /= mask.mean()
-        mape = np.abs((y_pred - y_true) / y_true)
-        mape = np.nan_to_num(mask * mape)
-        return np.mean(mape) * 100
+    y is shape of (B, 12, N), numpy ndarray
 
+    y_hat is a list with length predlen, each is a paddle.tensor of shape (B, N)
+    
+    Returns:
+    
+    the accuracy of the prediction y_hat
+    """
+    
+    acc_list = []
 
-def masked_mse_np(y_true, y_pred, null_val=np.nan):
-    mask = mask_np(y_true, null_val)
-    mask /= mask.mean()
-    mse = (y_true - y_pred) ** 2
-    return np.mean(np.nan_to_num(mask * mse))
-
-
-def masked_mae_np(y_true, y_pred, null_val=np.nan):
-    mask = mask_np(y_true, null_val)
-    mask /= mask.mean()
-    mae = np.abs(y_true - y_pred)
-    return np.mean(np.nan_to_num(mask * mae))
+    for index, tensor in enumerate(y_hat):
+        y_true = y[:, index, :]
+        y_pred = tensor.numpy()
+        accuracy = (y_pred == y_true).mean()
+        acc_list.append(accuracy)
+    return np.mean(acc_list)
+   
