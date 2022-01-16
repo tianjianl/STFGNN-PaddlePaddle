@@ -7,8 +7,7 @@ import paddle
 import pgl
 
 from pgl.utils.logger import log 
-from utils import (construct_model, generate_data, calc_acc)
-from data_loader.data_utils import gen_batch
+from utils import (construct_model, generate_data, calc_acc, gen_batch)
 
 def main(args):
     

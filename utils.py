@@ -6,7 +6,7 @@ import pandas as pd
 
 
 def construct_model(config):
-    from models.stsgcn_4n_res import STFGNNModel
+    from models.model import STFGNNModel
 
     module_type = config['module_type']
     act_type = config['act_type']
@@ -269,7 +269,35 @@ def generate_seq(data, train_length, pred_length):
     seq = np.expand_dims(seq, -1)
     return np.split(seq, 2, axis=1)
 
+def gen_batch(inputs, batch_size, dynamic_batch=False, shuffle=False):
+    """Data iterator in batch.
+    Args:
+        inputs: np.ndarray, [len_seq, n_frame, n_route, C_0], standard sequence units.
+        batch_size: int, size of batch.
+        dynamic_batch: bool, whether changes the batch size in the last batch 
+            if its length is less than the default.
+        shuffle: bool, whether shuffle the batches.
+    """
+    len_inputs = len(inputs)
+    
+    if shuffle:
+        np.random.seed(2021)
+        idx = np.arange(len_inputs)
+        np.random.shuffle(idx)
 
+    
+    for start_idx in range(0, len_inputs, batch_size):
+        end_idx = start_idx + batch_size
+        if end_idx > len_inputs:
+            if dynamic_batch:
+                end_idx = len_inputs
+            else:
+                break
+        if shuffle:
+            slide = idx[start_idx:end_idx]
+        else:
+            slide = slice(start_idx, end_idx)
+        yield inputs[slide]
  
 def calc_acc(y, y_hat):
     """
