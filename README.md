@@ -18,6 +18,7 @@ For details of the Dynamic Time Warping(DTW) algorithm, please refer to [wiki](h
 
 ## Requirements and Training 
 `sh run.sh` to install all the requirements and run a demo of the program to see the results.  
+You should observe the loss decreasing and the accuracy over 80%
   
 if you have already downloaded all the requirements, you may use  
 `python main.py --config config/individual_3layer_12T.json` to start training. 
